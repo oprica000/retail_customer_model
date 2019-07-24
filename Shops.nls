@@ -1,0 +1,153 @@
+
+breed [ shops shop ]
+
+
+shops-own[
+  owner-id
+  popularity
+  rate-of-popilarity-reduction
+  price
+  sales
+  StocZilnic
+  comandaaprov
+  IstoricVanzari
+  vanzaremediezilnica
+  valuta
+  shop-supply-cost
+  is-bankrupt
+  cost-fix
+  perioada-cost-fix
+  comanda-minima
+  last-ad-made
+  quality-value
+  product-life
+  ZileADS
+  selling-offer
+  min-selling-price
+  daily-sales
+  closing-inventory
+]
+
+
+
+to become-more-popular
+  ask shops
+  [
+    if any? customers-here
+    [
+      set popularity popularity + Incrementare-popularitate
+    ]
+  ]
+end
+
+to decay-popularity
+  ask shops
+  [
+    if popularity > 1 and not any? customers-here
+    [
+      set popularity popularity * ( ( 100 - rate-of-popilarity-reduction ) / 100 )
+    ]
+    if popularity < 1
+    [
+      set popularity 1
+    ]
+    if popularity > count customers
+    [
+      set popularity count customers
+    ]
+  ]
+end
+
+to shops-method
+  ask shops
+  [
+    set daily-sales sales
+    set closing-inventory StocZilnic
+    if ticks > 0 AND is-bankrupt != true
+    [
+      if days mod perioada-cost-fix = 0 AND ticks != 0
+      [
+        set valuta valuta - cost-fix
+      ]
+      ifelse days < ZileADS
+      [
+        set istoricvanzari lput sales istoricvanzari
+      ]
+      [
+        if not empty? istoricvanzari
+        [
+          set istoricvanzari remove-item 0 istoricvanzari
+        ]
+        set istoricvanzari lput sales istoricvanzari
+      ]
+
+      set vanzaremediezilnica mean istoricvanzari
+      set valuta valuta + sales * price
+      declansare-aprovizionare
+      create-ad
+      set sales 0
+
+      if valuta < -150 OR ( valuta < 0 AND stoczilnic = 0)
+      [
+        set color grey
+        set is-bankrupt true
+      ]
+
+    ]
+  ]
+end
+
+to declansare-aprovizionare
+  ifelse stoczilnic = 0 AND valuta > 0
+  [
+    aprovizionare
+  ]
+  [
+  set comandaaprov 0
+  ]
+end
+
+
+to aprovizionare
+  ifelse comanda-minima > vanzaremediezilnica
+  [
+  set comandaaprov comanda-minima
+  ]
+  [
+  set comandaaprov vanzaremediezilnica
+  ]
+  set stoczilnic round comandaaprov
+  set valuta valuta - round comandaaprov * shop-supply-cost
+end
+
+
+
+
+to create-ad
+  let order random ads-max-no
+  let aux-quality base-ad-quality * ( 1 + random base-ad-quality-variance - base-ad-quality-variance / 2 )
+  let aux-uniqueness base-uniqueness * ( 1 + random base-uniqueness-variance - base-uniqueness-variance / 2 )
+  let aux-cost (ad-cost-base + quality-cost-multi * aux-quality + uniqueness-cost-multi * aux-uniqueness)
+  if  valuta > ads-max-no * aux-cost AND last-ad-made < days
+    [
+      hatch-ads order
+      [
+        set owner-id [who] of myself
+        set owner myself
+        set view random 20
+        set shape "arrow"
+        set size 1
+        set no-of-costumers 0
+        set goal one-of customers
+        set quality aux-quality
+        set uniqueness aux-uniqueness
+        set ads-cost aux-cost
+      ]
+      set last-ad-made  days + ad-cooldown
+      set valuta valuta - order * aux-cost
+  ]
+end
+
+
+
+

@@ -1,0 +1,326 @@
+breed [ customers customer ]
+
+customers-own[
+  house
+  goal
+  income
+  is-shopping
+  cooldown-tick
+  opinion
+  resistance
+  persuasion
+  product-life
+  debit
+  pay-check-day
+  reached-agreement
+  max-buying-price
+  buying-offer
+  deal-price
+  deal-qty
+]
+
+to generate-customers
+
+
+  foreach sort-on [who] shops
+  [
+    the-shop -> ask the-shop
+    [
+      set index-list lput who index-list
+    ]
+  ]
+
+  create-customers Numar-cumparatori
+  [
+    setxy random-xcor random-ycor
+    set house one-of patches
+    set is-shopping true
+    set goal one-of shops
+    set color yellow
+    set size 2
+    set income min-income + random (max-income - min-income)
+    set debit min-starting-debit + random(max-starting-debit - min-starting-debit)
+    set opinion []
+    set reached-agreement false
+    repeat count shops
+    [
+      set opinion lput ( min-starting-opinion + random(max-starting-opinion - min-starting-opinion)) opinion
+    ]
+    set resistance (min-resistance + random (max-resistance - min-resistance))
+    set persuasion (min-persuasion + random(max-persuasion - min-persuasion))
+    set pay-check-day (min-paycheck-period + random(max-paycheck-period - min-paycheck-period))
+  ]
+end
+
+to customer-method
+  ask customers
+  [
+    if days MOD pay-check-day = 0 ;primeste salariu din x in x zile, x=pay-check-day
+    [
+      set debit debit + income
+    ]
+    ifelse is-shopping = true
+    [
+      let target one-of shops in-radius 1  ;magazinele isi aleg un magazin apropiat
+      ifelse goal = target AND goal != nobody ;daca a ajuns la magazin
+        [
+          print " "
+          set color blue
+          ask target
+          [
+            set min-selling-price Pret - (random 10 * prag-incrementare)
+            set selling-offer Pret
+            if show-print
+            [
+              print (word "min-selling-price (shop id=" who ")=" min-selling-price )
+            ]
+          ]
+          ifelse debit < [price] of target
+          [
+            set max-buying-price ((debit / 2 ) + (random 10 * prag-incrementare))
+          ]
+          [
+            set max-buying-price (([price] of target / 2 ) + (random 10 * prag-incrementare))
+          ]
+
+          if show-print
+          [
+            print (word " max-buying-price(customer id=" who ")=" max-buying-price )
+          ]
+          ifelse max-buying-price > [min-selling-price] of target
+          [
+            if show-print
+            [
+              print  "initial selling condition good"
+            ]
+            set buying-offer (3 * random (max-buying-price / 4)) + (max-buying-price / 4)
+
+
+            ;where is the selling offer
+            if show-print
+            [
+              print (word " initial buying-offer(customer id=" who ")=" buying-offer)
+            ]
+            if show-print
+            [
+              print (word "initial selling-offer(shop id=" [who] of target ")=" [selling-offer] of target)
+            ]
+            print " "
+            ifelse buying-offer >= [selling-offer] of target
+            [
+              if show-print
+              [
+                print  "reached agreement 1"; cand consumatorul e dispus sa plateasca pretul de la raft
+              ]
+              set reached-agreement true
+              set deal-price [selling-offer] of target
+              set deal-qty 1 + random max-buy-qty
+            ]
+            [
+              if not reached-agreement
+              [
+                let negotiation-rounds random 10 ;random num of negotiation rounds to avoid tight coupling between toughness and number of rounds needed for agreement
+                if show-print
+                [
+                  print (word "nego round " negotiation-rounds)
+                ]
+                repeat negotiation-rounds
+                [
+                  ask target
+                  [
+                    set selling-offer selling-offer - prag-incrementare
+                  ]
+                  if show-print
+                  [
+                    print (word "selling-offer(shop id=" [who] of target ")=" [selling-offer] of target)
+                  ]
+                  if buying-offer >= [selling-offer] of target
+                  [
+                    if show-print
+                    [
+                      print  "reached agreement 2"; cand magazinul scade pretul si se ajunge la deal
+                    ]
+                    set reached-agreement true
+                    set deal-price [selling-offer] of target
+                    set deal-qty 1 + random max-buy-qty
+                  ]
+
+                  set buying-offer buying-offer + prag-incrementare
+                  if show-print
+                  [
+                    print (word " buying-offer(customer id=" who ")=" buying-offer)
+                  ]
+                  print " "
+                  if buying-offer >= [selling-offer] of target
+                  [
+                    if show-print
+                    [
+                      print  "reached agreement 3"; cand consumatorul creste pretul si se ajunge la deal
+                    ]
+                    set reached-agreement true
+                    set deal-price buying-offer
+                    set deal-qty 1 + random max-buy-qty
+                  ]
+                ]
+              ]
+            ]
+            if reached-agreement
+              [
+                set reached-agreement false
+                while [debit <= deal-price * deal-qty]
+                [
+                  set deal-qty deal-qty - 1
+                ]
+                ifelse debit >= deal-price  ;daca venitul e suficient pt pretul magazinului
+                [
+                  ifelse ( [ StocZilnic ] of target ) >= deal-qty ;daca magazinul are stoc
+                  [
+                    let target-id [who] of target ;salveaza id ul magazinului
+                    set debit debit - deal-price  ;scade din venit pretul
+                    set is-shopping false ;obiectivul nu mai e de a cumpara
+                    ifelse [ quality-value ] of target > deal-price ;calitatea e mai mare decat pretul
+                    [
+                      set opinion (replace-item (position target-id index-list) opinion (item (position target-id index-list) opinion + 2)) ;creste opinia
+                    ]
+                    [
+                      set opinion (replace-item (position target-id index-list) opinion (item (position target-id index-list) opinion - 2))
+                ]
+                    set product-life [product-life] of target
+
+                    ask target
+                    [
+                      set sales sales + [deal-qty] of myself
+                      set StocZilnic StocZilnic - [deal-qty] of myself
+                    ]
+                  ]
+                  [
+                    ifelse coin-flip? [ choose-shop ] [ set is-shopping false ]
+                  ]
+                ]
+                [
+                  ifelse coin-flip? [ choose-shop ] [ set is-shopping false ]
+                ]
+
+            ]
+          ]
+          [
+            ifelse coin-flip? [choose-shop] [ set is-shopping false ]
+          ]
+      ]
+      [
+        walk-towards-goal
+      ]
+    ]
+    [
+      ifelse house = patch-here
+      [
+        go-shopping
+      ]
+      [
+        walk-towards-home
+      ]
+    ]
+    talk-with-others
+
+
+  ]
+
+end
+
+to go-shopping
+  if cooldown-tick < ticks
+  [
+
+    choose-shop
+    if goal != nobody
+    [
+      set color yellow
+      set is-shopping true
+    ]
+  ]
+end
+
+
+to walk-towards-goal
+  ifelse goal != NOBODY
+  [
+    face goal
+    fd 1
+  ]
+  [
+    set is-shopping false
+  ]
+end
+
+to walk-towards-home
+  face house
+  fd 1
+  set cooldown-tick ticks + product-life
+  set color green
+end
+
+to choose-shop
+  let pick random-float sum [popularity] of shops with [ is-bankrupt = false ]
+  let winner nobody
+  ask shops
+    [
+      if winner = nobody
+        [
+          ifelse popularity > pick AND [item (position ([who] of goal) index-list) opinion > 0] of myself
+            [
+              set winner self
+            ]
+            [
+              set pick pick - popularity
+            ]
+        ]
+    ]
+  ifelse winner = nobody
+  [
+    set color gray
+    set is-shopping false
+  ]
+  [
+    set goal winner
+  ]
+end
+
+to talk-with-others
+  if true ;random 100 < 10
+  [
+    let talkmate one-of customers-here
+    ask talkmate
+    [
+      let index  0
+      repeat numar-magazine
+      [
+        if ABS item index opinion > 40
+        [
+          set opinion (replace-item index opinion (item index opinion + item index [opinion] of myself * [persuasion] of myself * 0.1))
+          ifelse  MAX opinion > 40
+          [
+            set shape "face happy"
+          ]
+          [
+            ifelse MIN opinion < 0
+            [
+              set shape "face sad"
+            ]
+            [
+              set shape "face neutral"
+            ]
+          ]
+        ]
+        normalise-opinions index
+        set index index + 1
+      ]
+    ]
+  ]
+end
+
+to normalise-opinions [ index ]
+  if item index opinion > 100
+  [set opinion replace-item index opinion 100]
+  if item index opinion < -100
+  [set opinion replace-item index opinion -100]
+end

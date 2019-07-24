@@ -1,0 +1,40 @@
+breed [ ads ad ]
+
+ads-own
+[ goal
+  ads-cost
+  view
+  no-of-costumers
+  owner-id ; the id of the shop that made the ad
+  owner
+  quality
+  uniqueness
+]
+
+to move-ads
+  ask ads
+  [
+    ifelse [is-bankrupt] of owner = false
+    [
+      let target-var one-of customers in-radius 2
+      ifelse target-var = goal
+      [
+        ask customers
+        [
+          let index [owner-id] of myself
+          set opinion (replace-item (position index index-list) opinion (item (position index index-list) opinion + [uniqueness] of myself * (1 - resistance / 100)))
+        ]
+        set no-of-costumers  no-of-costumers + 1
+        if no-of-costumers = view [ die ]
+        set goal one-of customers
+      ]
+      [
+        face goal
+        fd 2
+      ]
+    ]
+    [
+      die
+    ]
+  ]
+end

@@ -1,0 +1,133 @@
+breed [ clients client ]
+
+clients-own [
+ client-id
+
+
+  popularity
+  rate-of-popilarity-reduction
+  price
+  sales
+  StocZilnic
+  comandaaprov
+  IstoricVanzari
+  vanzaremediezilnica
+  valuta
+  shop-supply-cost
+  is-bankrupt
+  cost-fix
+  perioada-cost-fix
+  comanda-minima
+  ZileADS
+  product-life
+  last-ad-made
+]
+
+
+to listen-clients
+  while [ hubnet-message-waiting? ]
+  [
+    hubnet-fetch-message
+    ifelse hubnet-enter-message?
+    [ create-new-client ]
+    [
+      ifelse hubnet-exit-message?
+      [ remove-client ]
+      [
+        ask clients with [ client-id = hubnet-message-source ]
+          [ execute-command hubnet-message-tag ]
+      ]
+    ]
+  ]
+  ask clients  [ send-info-to-client ]
+  broadcast-info-to-clients
+end
+
+
+
+to create-new-client
+  create-clients 1
+  [
+    setup-client-vars
+  ]
+end
+
+
+to setup-client-vars  ;; turtle procedure
+  hide-turtle
+  set client-id hubnet-message-source
+  setxy random-xcor random-ycor
+  set heading 0
+  reset-client-stats
+end
+
+to remove-client
+  ask clients with [client-id = hubnet-message-source]
+  [
+    ask shops with [ owner-id = [client-id] of myself][die]
+    die
+  ]
+end
+
+
+to reset-client-stats
+  set popularity Popularitate-initiala
+  set rate-of-popilarity-reduction Rata-reducere-popularitate
+  set price 0
+  set sales 0
+  set StocZilnic Stoc-initial
+  set comandaaprov 0
+  set vanzaremediezilnica 0
+  set valuta Valutal-initiala
+  set shop-supply-cost Cost-aprovizionare
+  set is-bankrupt false
+  set Istoricvanzari []
+  set cost-fix Cost-fix-setup
+  set perioada-cost-fix Perioada-cost-fix-setup
+  set comanda-minima Comanda-minima-Setup
+  set product-life base-product-life  - product-life-variation / 2 + (random product-life-variation)
+  set ZileADS ZileADS-setup
+  set last-ad-made 0
+end
+
+
+to execute-command [command]
+
+  if command = "Price" [set price hubnet-message stop]
+  if command = "ZileADS" [set ZileADS hubnet-message stop]
+  if command = "shop-color" [set color hubnet-message stop]
+  if command = "x-cor" [set xcor hubnet-message stop]
+  if command = "y-cor" [set ycor hubnet-message stop]
+
+  if command = "create-shop"
+  [
+    if NOT any? shops with [ owner-id = [client-id] of myself AND color != gray]
+    [
+      hatch-shops 1
+      [
+        show-turtle
+        set size 3
+        set owner-id [client-id] of myself
+      ]
+    ]
+  ]
+end
+
+
+
+to send-info-to-client
+  hubnet-send client-id "client-shop-id" ([who] of shops with [owner-id = [client-id] of myself])
+  hubnet-send client-id "Sales-history" ([Istoricvanzari] of shops with [owner-id = [client-id] of myself])
+  hubnet-send client-id "Days" days
+  hubnet-send client-id "Popularity" ([popularity] of shops with [owner-id = [client-id] of myself])
+  hubnet-send client-id "Valuta" ([valuta] of shops with [owner-id = [client-id] of myself])
+  hubnet-send client-id "Costs-per-product" Cost-aprovizionare
+end
+
+
+to broadcast-info-to-clients
+  if any? clients
+  [
+
+  ]
+end
